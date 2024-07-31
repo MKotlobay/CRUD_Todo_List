@@ -4,13 +4,55 @@ const path = require('path');
 const app = express();
 const port = 3000;
 
-
 app.use(express.json());
+app.use(express.static('public'));
 
 let todos = [];
+let isAuthenticated = false; // Global variable to track authentication
+
+//#region Login section & pages pass
+// Login page
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Approved page
+app.get('/approved', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'approved.html'));
+});
+
+// Login requests
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    if (username === 'admin' && password === 'admin') {
+        isAuthenticated = true; // Set authenticated flag
+        res.status(200).json({ message: 'Login successful' });
+    } else {
+        res.status(401).json({ message: 'Invalid credentials' });
+    }
+});
+
+// Logout requests
+app.post('/logout', (req, res) => {
+    isAuthenticated = false; // Clear authentication status
+    res.status(200).json({ message: 'Logged out successfully' });
+});
+
+// Middleware to check if user is authenticated
+const authMiddleware = (req, res, next) => {
+    if (isAuthenticated) {
+        next();
+    } else {
+        res.redirect('/'); // Redirect to login page if not authenticated
+    }
+};
+//#endregion End login section & pages pass
+
+// Apply the authentication middleware only to routes that require authentication
+app.use('/todos/', authMiddleware);
 
 // Builds a list with "Unique ID" based on time added
-app.post('/', (req, res) => {
+app.post('/todos/', (req, res) => {
     const newTodo = {
         id: Date.now().toString(),
         ...req.query
@@ -32,24 +74,20 @@ app.post('/', (req, res) => {
     });
 });
 
-
-
 // Shows all lists
-app.get('/', (req, res) => {
+app.get('/todos/', (req, res) => {
     res.json(todos);
 });
 
 // Shows only by ID full details about
-app.get('/:id', (req, res) => {
+app.get('/todos/:id', (req, res) => {
     const id = req.params.id;
     const todo = todos.find(todo => todo.id === id);
-    res.json(todo)
+    res.json(todo);
 });
 
-
-
 // Deletes the ID with its row from file "todoList.txt" else deletes all todos if no ID was provided
-app.delete('/:id?', (req, res) => {
+app.delete('/todos/:id?', (req, res) => {
     const id = req.params.id;
     const filePath = path.join(__dirname, 'data', 'todoList.txt');
     const archivePath = path.join(__dirname, 'data', 'archive.txt');
@@ -120,10 +158,8 @@ app.delete('/:id?', (req, res) => {
     }
 });
 
-
-
 // Updating fields of a todo using unique ID and query parameters
-app.patch('/:id', (req, res) => {
+app.patch('/todos/:id', (req, res) => {
     const id = req.params.id;
     const todo = todos.find(todo => todo.id === id);
     if (!todo) {
@@ -168,32 +204,7 @@ app.patch('/:id', (req, res) => {
     });
 });
 
-
-
-//#region Check that for "express routing authentication"
-const authMiddleware = (req, res, next) => {
-    const { username, password } = req.body;
-
-    if (username === 'admin' && password === 'admin') {
-        next();
-    } else {
-        res.status(401).json({ message: 'Unauthorized' });
-    }
-};
-
-app.post('/login', (req, res) => {
-    const { username, password } = req.body;
-
-    if (username === 'admin' && password === 'admin') {
-        res.status(200).json({ message: 'Login successful' });
-    } else {
-        res.status(401).json({ message: 'Invalid credentials' });
-    }
+// Listen on the specified port
+app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
 });
-
-app.get('/protected', authMiddleware, (req, res) => {
-    res.status(200).json({ message: 'This is a protected route' });
-});
-//#endregion
-
-app.listen(port);
